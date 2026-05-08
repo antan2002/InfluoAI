@@ -1,19 +1,17 @@
-import { Configuration, OpenAIApi } from "openai-edge";
-import { Message, OpenAIStream, StreamingTextResponse } from "ai";
-
+import OpenAI from "openai";
+import { OpenAIStream } from "ai";
 import { NextResponse } from "next/server";
 import { OramaManager } from "@/lib/orama";
 import { db } from "@/server/db";
 import { auth } from "@clerk/nextjs/server";
 import { getSubscriptionStatus } from "@/lib/stripe-actions";
 import { FREE_CREDITS_PER_DAY } from "@/app/constants";
+import type { Message } from "ai";
 
-// export const runtime = "edge";
-
-const config = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
+const openai = new OpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: process.env.OPENROUTER_API_KEY,
 });
-const openai = new OpenAIApi(config);
 
 export async function POST(req: Request) {
     try {
@@ -24,80 +22,58 @@ export async function POST(req: Request) {
         const isSubscribed = await getSubscriptionStatus()
         if (!isSubscribed) {
             const chatbotInteraction = await db.chatbotInteraction.findUnique({
-                where: {
-                    day: new Date().toDateString(),
-                    userId
-                }
+                where: { day: new Date().toDateString(), userId }
             })
             if (!chatbotInteraction) {
                 await db.chatbotInteraction.create({
-                    data: {
-                        day: new Date().toDateString(),
-                        count: 1,
-                        userId
-                    }
+                    data: { day: new Date().toDateString(), count: 1, userId }
                 })
             } else if (chatbotInteraction.count >= FREE_CREDITS_PER_DAY) {
                 return NextResponse.json({ error: "Limit reached" }, { status: 429 });
             }
         }
+
         const { messages, accountId } = await req.json();
         const oramaManager = new OramaManager(accountId)
         await oramaManager.initialize()
-
         const lastMessage = messages[messages.length - 1]
-
-
         const context = await oramaManager.vectorSearch({ prompt: lastMessage.content })
-        console.log(context.hits.length + ' hits found')
-        // console.log(context.hits.map(hit => hit.document))
 
         const prompt = {
-            role: "system",
-            content: `You are an AI email assistant embedded in an email client app. Your purpose is to help the user compose emails by answering questions, providing suggestions, and offering relevant information based on the context of their previous emails.
+            role: "system" as const,
+            content: `You are an AI email assistant embedded in an email client app.
             THE TIME NOW IS ${new Date().toLocaleString()}
-      
-      START CONTEXT BLOCK
-      ${context.hits.map((hit) => JSON.stringify(hit.document)).join('\n')}
-      END OF CONTEXT BLOCK
-      
-      When responding, please keep in mind:
-      - Be helpful, clever, and articulate.
-      - Rely on the provided email context to inform your responses.
-      - If the context does not contain enough information to answer a question, politely say you don't have enough information.
-      - Avoid apologizing for previous responses. Instead, indicate that you have updated your knowledge based on new information.
-      - Do not invent or speculate about anything that is not directly supported by the email context.
-      - Keep your responses concise and relevant to the user's questions or the email being composed.`
+            START CONTEXT BLOCK
+            ${context.hits.map((hit) => JSON.stringify(hit.document)).join('\n')}
+            END OF CONTEXT BLOCK
+            - Be helpful, clever, and articulate.
+            - Rely on the provided email context to inform your responses.
+            - If the context does not contain enough information, politely say you don't have enough information.
+            - Keep your responses concise and relevant.`
         };
 
-
-        const response = await openai.createChatCompletion({
-            model: "gpt-4",
+        const response = await openai.chat.completions.create({
+            model: "openai/gpt-oss-120b:free",
             messages: [
                 prompt,
                 ...messages.filter((message: Message) => message.role === "user"),
             ],
             stream: true,
         });
-        const stream = OpenAIStream(response, {
-            onStart: async () => {
-            },
-            onCompletion: async (completion) => {
+
+        const stream = OpenAIStream(response as any, {
+            onCompletion: async () => {
                 const today = new Date().toDateString()
-                await db.chatbotInteraction.update({
-                    where: {
-                        userId,
-                        day: today
-                    },
-                    data: {
-                        count: {
-                            increment: 1
-                        }
-                    }
+                await db.chatbotInteraction.upsert({
+                    where: { userId, day: today },
+                    create: { userId, day: today, count: 1 },
+                    update: { count: { increment: 1 } }
                 })
             },
         });
-        return new StreamingTextResponse(stream);
+        return new Response(stream, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" }
+});
     } catch (error) {
         console.log(error)
         return NextResponse.json({ error: "error" }, { status: 500 });

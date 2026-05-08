@@ -27,21 +27,21 @@ class Account {
     }
 
     async createSubscription() {
-        const webhookUrl = process.env.NODE_ENV === 'development' ? 'https://potatoes-calculator-reports-crisis.trycloudflare.com' : process.env.NEXT_PUBLIC_URL
-        const res = await axios.post('https://api.aurinko.io/v1/subscriptions',
-            {
-                resource: '/email/messages',
-                notificationUrl: webhookUrl + '/api/aurinko/webhook'
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                }
+    const webhookUrl = process.env.NEXT_PUBLIC_URL
+    const res = await axios.post('https://api.aurinko.io/v1/subscriptions',
+        {
+            resource: '/email/messages',
+            notificationUrl: webhookUrl + '/api/aurinko/webhook'
+        },
+        {
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
             }
-        )
-        return res.data
-    }
+        }
+    )
+    return res.data
+}
 
     async syncEmails() {
         const account = await db.account.findUnique({
@@ -107,7 +107,7 @@ class Account {
     async performInitialSync() {
         try {
             // Start the sync process
-            const daysWithin = 3
+            const daysWithin = 90
             let syncResponse = await this.startSync(daysWithin); // Sync emails from the last 7 days
 
             // Wait until the sync is ready

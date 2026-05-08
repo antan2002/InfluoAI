@@ -1,17 +1,19 @@
 'use server';
-import TurndownService from 'turndown'
-
 import { streamText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
 import { createStreamableValue } from 'ai/rsc';
 
+const openrouter = createOpenAI({
+    baseURL: "https://openrouter.ai/api/v1",
+    apiKey: process.env.OPENROUTER_API_KEY ?? "",
+});
+
 export async function generateEmail(context: string, prompt: string) {
-    console.log("context", context)
     const stream = createStreamableValue('');
 
     (async () => {
         const { textStream } = await streamText({
-            model: openai('gpt-4-turbo'),
+            model: openrouter('meta-llama/llama-3.3-70b-instruct:free'),
             prompt: `
             You are an AI email assistant embedded in an email client app. Your purpose is to help the user compose emails by providing suggestions and relevant information based on the context of their previous emails.
             
@@ -40,7 +42,6 @@ export async function generateEmail(context: string, prompt: string) {
         for await (const delta of textStream) {
             stream.update(delta);
         }
-
         stream.done();
     })();
 
@@ -50,10 +51,9 @@ export async function generateEmail(context: string, prompt: string) {
 export async function generate(input: string) {
     const stream = createStreamableValue('');
 
-    console.log("input", input);
     (async () => {
         const { textStream } = await streamText({
-            model: openai('gpt-4'),
+            model: openrouter('meta-llama/llama-3.3-70b-instruct:free'),
             prompt: `
             ALWAYS RESPOND IN PLAIN TEXT, no html or markdown.
             You are a helpful AI embedded in a email client app that is used to autocomplete sentences, similar to google gmail autocomplete
@@ -78,7 +78,6 @@ export async function generate(input: string) {
         for await (const delta of textStream) {
             stream.update(delta);
         }
-
         stream.done();
     })();
 

@@ -4,19 +4,56 @@ import type { EmailMessage } from './types';
 import { auth } from '@clerk/nextjs/server';
 import { getSubscriptionStatus } from './stripe-actions';
 import { db } from '@/server/db';
+import { currentUser } from '@clerk/nextjs/server';
 import { FREE_ACCOUNTS_PER_USER, PRO_ACCOUNTS_PER_USER } from '@/app/constants';
 
 export const getAurinkoAuthorizationUrl = async (serviceType: 'Google' | 'Office365') => {
     const { userId } = await auth()
     if (!userId) throw new Error('User not found')
 
-    const user = await db.user.findUnique({
-        where: {
-            id: userId
-        }, select: { role: true }
-    })
+   let user = await db.user.findUnique({
+    where: {
+        id: userId
+    },
+    select: {
+        id: true,
+        role: true
+    }
+})
 
-    if (!user) throw new Error('User not found')
+if (!user) {
+    const clerkUser =
+        await currentUser()
+
+    if (!clerkUser) {
+        throw new Error(
+            'Clerk user not found'
+        )
+    }
+
+    user = await db.user.create({
+        data: {
+            id: clerkUser.id,
+
+            emailAddress:
+                clerkUser.emailAddresses?.[0]
+                    ?.emailAddress || "",
+
+            firstName:
+                clerkUser.firstName,
+
+            lastName:
+                clerkUser.lastName,
+
+            imageUrl:
+                clerkUser.imageUrl,
+        },
+        select: {
+            id: true,
+            role: true
+        }
+    })
+}
 
     const isSubscribed = await getSubscriptionStatus()
 
