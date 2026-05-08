@@ -10,7 +10,9 @@ import { ThemeProvider } from "@/components/theme-provicer";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "InfluoAI",
+  title: "Mailix — Email that thinks with you",
+  description:
+    "AI-powered email client with semantic search, smart compose, and real-time sync.",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
