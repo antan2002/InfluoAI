@@ -1,18 +1,21 @@
-// TODO: Build integrations/showcase section with logo cloud or integration cards
-
-import SectionContainer from "./section-container";
-import SectionHeading from "./section-heading";
+import { INTEGRATIONS } from "@/lib/constants/landing";
 
 export default function Integrations() {
   return (
-    <SectionContainer id="integrations">
-      <SectionHeading
-        title="Integrations"
-        subtitle="Seamlessly connect with your favorite tools"
-      />
-      <div>
-        {/* TODO: Add integration logos, labels, or cards */}
+    <section className="px-4 py-20 text-center">
+      <p className="mb-8 text-sm uppercase tracking-widest text-black/30">
+        Works with your stack
+      </p>
+      <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-center gap-6">
+        {INTEGRATIONS.map((item) => (
+          <div
+            key={item}
+            className="bg-black/5 rounded-full border border-black/10 px-5 py-2.5 text-sm text-black/40"
+          >
+            {item}
+          </div>
+        ))}
       </div>
-    </SectionContainer>
+    </section>
   );
 }
